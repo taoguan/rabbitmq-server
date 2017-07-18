@@ -380,7 +380,7 @@
 %% Protocol
 
 
--behaviour(gen_server2).
+-behaviour(gen_server).
 
 -export([create_tables/0, start_link/4, leave/1, broadcast/2, broadcast/3,
          confirmed_broadcast/2, info/1, validate_members/2, forget_group/1]).
@@ -508,24 +508,24 @@ table_definitions() ->
     [{Name, [?TABLE_MATCH | Attributes]}].
 
 start_link(GroupName, Module, Args, TxnFun) ->
-    gen_server2:start_link(?MODULE, [GroupName, Module, Args, TxnFun], []).
+    gen_server:start_link(?MODULE, [GroupName, Module, Args, TxnFun], []).
 
 leave(Server) ->
-    gen_server2:cast(Server, leave).
+    gen_server:cast(Server, leave).
 
 broadcast(Server, Msg) -> broadcast(Server, Msg, 0).
 
 broadcast(Server, Msg, SizeHint) ->
-    gen_server2:cast(Server, {broadcast, Msg, SizeHint}).
+    gen_server:cast(Server, {broadcast, Msg, SizeHint}).
 
 confirmed_broadcast(Server, Msg) ->
-    gen_server2:call(Server, {confirmed_broadcast, Msg}, infinity).
+    gen_server:call(Server, {confirmed_broadcast, Msg}, infinity).
 
 info(Server) ->
-    gen_server2:call(Server, info, infinity).
+    gen_server:call(Server, info, infinity).
 
 validate_members(Server, Members) ->
-    gen_server2:cast(Server, {validate_members, Members}).
+    gen_server:cast(Server, {validate_members, Members}).
 
 forget_group(GroupName) ->
     {atomic, ok} = mnesia:sync_transaction(
@@ -537,7 +537,7 @@ forget_group(GroupName) ->
 init([GroupName, Module, Args, TxnFun]) ->
     put(process_name, {?MODULE, GroupName}),
     Self = make_member(GroupName),
-    gen_server2:cast(self(), join),
+    gen_server:cast(self(), join),
     {ok, #state { self                = Self,
                   left                = {Self, undefined},
                   right               = {Self, undefined},
@@ -552,8 +552,7 @@ init([GroupName, Module, Args, TxnFun]) ->
                   broadcast_buffer_sz = 0,
                   broadcast_timer     = undefined,
                   txn_executor        = TxnFun,
-                  shutting_down       = false }, hibernate,
-     {backoff, ?HIBERNATE_AFTER_MIN, ?HIBERNATE_AFTER_MIN, ?DESIRED_HIBERNATE}}.
+                  shutting_down       = false }}.
 
 
 handle_call({confirmed_broadcast, _Msg}, _From,
@@ -888,7 +887,7 @@ noreply(State) ->
 reply(Reply, State) ->
     {reply, Reply, ensure_broadcast_timer(State), flush_timeout(State)}.
 
-flush_timeout(#state{broadcast_buffer = []}) -> hibernate;
+flush_timeout(#state{broadcast_buffer = []}) -> infinity;
 flush_timeout(_)                             -> 0.
 
 ensure_broadcast_timer(State = #state { broadcast_buffer = [],
@@ -1557,7 +1556,7 @@ maybe_confirm(Self, Self, Confirms, [PubNum | PubNums]) ->
         {empty, _Confirms} ->
             Confirms;
         {{value, {PubNum, From}}, Confirms1} ->
-            gen_server2:reply(From, ok),
+            gen_server:reply(From, ok),
             maybe_confirm(Self, Self, Confirms1, PubNums);
         {{value, {PubNum1, _From}}, _Confirms} when PubNum1 > PubNum ->
             maybe_confirm(Self, Self, Confirms, PubNums)
@@ -1566,7 +1565,7 @@ maybe_confirm(_Self, _Id, Confirms, _PubNums) ->
     Confirms.
 
 purge_confirms(Confirms) ->
-    _ = [gen_server2:reply(From, ok) || {_PubNum, From} <- queue:to_list(Confirms)],
+    _ = [gen_server:reply(From, ok) || {_PubNum, From} <- queue:to_list(Confirms)],
     queue:new().
 
 
@@ -1601,8 +1600,8 @@ last_pub(List, LP) -> {PubNum, _Msg} = lists:last(List),
 
 %% Uninstrumented versions
 
-call(Pid, Msg, Timeout) -> gen_server2:call(Pid, Msg, Timeout).
-cast(Pid, Msg)          -> gen_server2:cast(Pid, Msg).
+call(Pid, Msg, Timeout) -> gen_server:call(Pid, Msg, Timeout).
+cast(Pid, Msg)          -> gen_server:cast(Pid, Msg).
 monitor(Pid)            -> erlang:monitor(process, Pid).
 demonitor(MRef)         -> erlang:demonitor(MRef).
 
